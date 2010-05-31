@@ -182,6 +182,7 @@ class DownloadPanel(wx.Panel):
 class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
     dl_path = ""
     download_panels = []
+    num_completed
 
     def __init__(self, parent):
         wx.lib.scrolledpanel.ScrolledPanel.__init__(self, parent, wx.ID_ANY)
@@ -205,8 +206,6 @@ class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
                 print "Removing panel"
                 self.download_panels.remove(panel)
                 self.vbox.Remove(panel)
-            elif panel.IsCompleted():
-                self.download_panels.remove(panel)
             else:
                 panel.Update()
 
