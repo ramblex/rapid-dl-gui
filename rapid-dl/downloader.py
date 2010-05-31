@@ -9,12 +9,6 @@ import os
 import threading
 import time
 
-def setup_cookie():
-    cj = cookielib.LWPCookieJar()
-    cj.load("/Users/alexduller/.rapid-dl/cookies/gui.cookie")
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    urllib2.install_opener(opener)
-
 class Downloader():
     chunk_size = 8192
 
@@ -191,7 +185,6 @@ class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
 
     def __init__(self, parent):
         wx.lib.scrolledpanel.ScrolledPanel.__init__(self, parent, wx.ID_ANY)
-        setup_cookie()
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.vbox)
         self.SetupScrolling()
@@ -212,6 +205,8 @@ class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
                 print "Removing panel"
                 self.download_panels.remove(panel)
                 self.vbox.Remove(panel)
+            elif panel.IsCompleted():
+                self.download_panels.remove(panel)
             else:
                 panel.Update()
 

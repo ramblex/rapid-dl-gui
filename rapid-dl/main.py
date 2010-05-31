@@ -7,6 +7,7 @@ import os
 import time
 
 from downloader import DownloadList
+from settings import Settings, load_cookie
 
 class RapidGUIFrame(wx.Frame):
     def __init__(self, parent, id, title):
@@ -36,8 +37,13 @@ class RapidGUIFrame(wx.Frame):
         clear_btn = wx.Button(self.panel, -1, label='Clear')
         clear_btn.Bind(wx.EVT_BUTTON, self.OnClearBtn)
 
+        # Settings button
+        settings_btn = wx.Button(self.panel, -1, label='Settings')
+        settings_btn.Bind(wx.EVT_BUTTON, self.OnSettingsBtn)
+
         self.buttonSizer.Add(download_btn, 0)
         self.buttonSizer.Add(clear_btn, 0, wx.LEFT | wx.ALIGN_RIGHT, 20)
+        self.buttonSizer.Add(settings_btn, 0)
 
         # Add everything to the sizer
         self.vbox.Add(enterurls, 0, wx.LEFT, 10)
@@ -50,6 +56,10 @@ class RapidGUIFrame(wx.Frame):
         self.panel.SetSizerAndFit(self.vbox)
         self.Centre()
         self.Show(True)
+
+    def OnSettingsBtn(self, event):
+        settingsframe = Settings(None, -1, "Settings")
+        settingsframe.Show(True)
 
     def OnDownloadBtn(self, event):
         dial = wx.DirDialog(None, "Choose a download directory", 
@@ -76,19 +86,12 @@ class RapidGUIFrame(wx.Frame):
                             len(self.dl_list.GetDownloadPanels()))
 
 class RapidGUI(wx.App):
-    logdir = "/Users/alexduller/.rapid-dl/logs/"
-    processes = {}
-
     def OnInit(self):
         frame = RapidGUIFrame(None, -1, "Rapidshare Downloader")
         frame.Show(True)
+        load_cookie()
         self.SetTopWindow(frame)
         return True
-
-    def download(url):
-        filename = os.path.basename(url)
-        self.processes[filename] = subprocess.Popen(['rapid-dl', url])
-        print "Downloading '"+filename+"'"
 
 if __name__ == "__main__":
     app = RapidGUI(0)
