@@ -23,16 +23,19 @@ class Downloader():
         URL. Return a handle to the URL"""
         try:
             server_url = self.get_server_url(self.url)
-            if server_url == None:
+            if not server_url.startswith("http://"):
+                # @todo Throw an exception?
                 return None
             actual_url = self.get_actual_url(server_url)
-            if actual_url == None:
+            if not actual_url.startswith("http://"):
+                # @todo Throw an exception?
                 return None
             request = urllib2.Request(actual_url)
             self.handle = urllib2.urlopen(request)
-            if self.handle != None:
-                self.get_data()
-            return True
+            if self.handle == None:
+                # @todo Throw an exception?
+                return None
+            return self.get_data(self.handle)
         except ValueError:
             self.panel.Remove()
             dlg = wx.MessageDialog(None, "Invalid URL", "Error",
@@ -40,7 +43,12 @@ class Downloader():
             dlg.ShowModal()
 
     def get_server_url(self, url):
-        """Find the server URL from a given rapidshare URL"""
+        """Find the server URL from a given rapidshare URL
+
+        Arguments:
+        - url: The URL which is shared 
+               e.g. http://rapidshare.com/files/12038012/myfile.rar
+        """
         request = urllib2.Request(url)
         handle = urllib2.urlopen(request)
         page = handle.read()
@@ -52,7 +60,12 @@ class Downloader():
             return None
 
     def get_actual_url(self, server_url):
-        """Find the download URL from a given server URL"""
+        """Find the download URL from a given server URL.
+        
+        Arguments:
+        - server_url: A rapidshare server URL
+                      e.g. http://rs1029.rapidshare.com/files/109238/myfile.rar
+        """
         opts = {'dl.start': 'PREMIUM'}
         data = urllib.urlencode(opts)
         request = urllib2.Request(server_url, data)
@@ -67,31 +80,39 @@ class Downloader():
     def filename(self):
         return self.handle.info().getheader('Content-disposition').split("=")[-1]
 
-    def get_data(self):
-        total_size = int(self.handle.info().getheader('Content-Length').strip())
+    def get_data(self, handle):
+        """Download the data from the given handle and update the
+        associated panel. Note that this will only update the data in
+        the panel using its mutators and not the panel GUI since this
+        method is probably being executed in a thread and hence should
+        not update the GUI directly.
+        """
+        total_size = int(handle.info().getheader('Content-Length').strip())
+        filename = handle.info().getheader('Content-disposition').split("=")[-1]
         one_percent = total_size / 1000.0
         bytes_so_far = 0.0
-        out = open(self.dl_path+"/"+self.filename(), "w")
+        out = open(self.dl_path+"/"+filename, "w")
         num_blocks = 0
         while 1:
             if num_blocks == 1:
                 start_time = time.time()
                 start_size = bytes_so_far
-            chunk = self.handle.read(self.chunk_size)
+            chunk = handle.read(self.chunk_size)
             out.write(chunk)
             bytes_so_far += len(chunk)
-            if not chunk or self.panel.IsCancelled():
+            if not chunk or self.panel.cancelled:
                 break
             percent_done = round((bytes_so_far / total_size) * 100, 2)
-            self.panel.SetPercentDone(percent_done)
+            self.panel.percent_done = percent_done
             if num_blocks == 50:
                 elapsed = time.time() - start_time
                 byte_rate = (bytes_so_far - start_size)
                 bytes_left = total_size - bytes_so_far
-                self.panel.SetETA(bytes_left / byte_rate)
-                self.panel.SetRate(byte_rate / elapsed / 1024)
+                self.panel.eta = bytes_left / byte_rate
+                self.panel.rate = byte_rate / elapsed / 1024
                 num_blocks = 0
             num_blocks = num_blocks + 1
+        return True
 
 class DownloadPanel(wx.Panel):
     cancelled = False
@@ -128,7 +149,7 @@ class DownloadPanel(wx.Panel):
     def Update(self):
         self.gauge.SetValue(self.percent_done)
         self.complete_lbl.SetLabel("%s%%" % self.percent_done)
-        if self.IsCancelled():
+        if self.cancelled:
             self.rate_lbl.SetLabel("(Cancelled)")
             self.eta_lbl.SetLabel("")
         elif self.IsCompleted():
@@ -145,20 +166,8 @@ class DownloadPanel(wx.Panel):
     def ToBeRemoved(self):
         return self.remove
 
-    def SetETA(self, eta):
-        self.eta = eta
-
-    def SetRate(self, r):
-        self.rate = r
-
-    def SetPercentDone(self, p):
-        self.percent_done = p
-
     def IsCompleted(self):
         return (self.percent_done == 100)
-
-    def IsCancelled(self):
-        return self.cancelled
 
     def Cancel(self):
         self.cancelled = True
@@ -202,9 +211,11 @@ class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
         panels = self.download_panels[:]
         for panel in panels:
             if panel.ToBeRemoved():
-                print "Removing panel"
-                self.download_panels.remove(panel)
+                print "Removing panel", panel.filename
+                panel.Hide()
                 self.vbox.Remove(panel)
+                self.vbox.Layout()
+                self.download_panels.remove(panel)
             else:
                 panel.Update()
 
