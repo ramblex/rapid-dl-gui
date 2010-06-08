@@ -15,6 +15,22 @@ class RapidGUIFrame(wx.Frame):
     def __init__(self, parent, id, title):
         wx.Frame.__init__(self, parent, id, title, size=(800, 500))
 
+        menubar = wx.MenuBar()
+
+        # File menu
+        filemenu = wx.Menu()
+        quit = wx.MenuItem(filemenu, 1, '&Quit\tCtrl+Q')
+        filemenu.AppendItem(quit)
+        self.Bind(wx.EVT_MENU, self.OnQuit, id=1)
+        menubar.Append(filemenu, '&File')
+
+        # Edit menu
+        editmenu = wx.Menu()
+        settings = wx.MenuItem(editmenu, 2, 'Settings')
+        editmenu.AppendItem(settings)
+        self.Bind(wx.EVT_MENU, self.OnSettings, id=2)
+        menubar.Append(editmenu, '&Edit')
+
         self.nb = wx.Notebook(self, -1)
 
         self.panel = wx.Panel(self.nb, -1)
@@ -40,12 +56,12 @@ class RapidGUIFrame(wx.Frame):
         clear_btn.Bind(wx.EVT_BUTTON, self.OnClearBtn)
 
         # Settings button
-        settings_btn = wx.Button(self.panel, -1, label='Settings')
-        settings_btn.Bind(wx.EVT_BUTTON, self.OnSettingsBtn)
+        #settings_btn = wx.Button(self.panel, -1, label='Settings')
+        #settings_btn.Bind(wx.EVT_BUTTON, self.OnSettingsBtn)
 
         self.buttonSizer.Add(download_btn, 0)
         self.buttonSizer.Add(clear_btn, 0, wx.LEFT | wx.ALIGN_RIGHT, 20)
-        self.buttonSizer.Add(settings_btn, 0)
+        #self.buttonSizer.Add(settings_btn, 0)
 
         # Add everything to the sizer
         self.vbox.Add(enterurls, 0, wx.LEFT, 10)
@@ -56,10 +72,14 @@ class RapidGUIFrame(wx.Frame):
         self.nb.AddPage(self.dl_list, 'Current downloads')
         self.panel.SetFocus()
         self.panel.SetSizerAndFit(self.vbox)
+        self.SetMenuBar(menubar)
         self.Centre()
         self.Show(True)
 
-    def OnSettingsBtn(self, event):
+    def OnQuit(self, event):
+        self.Close()
+
+    def OnSettings(self, event):
         settingsframe = Settings(None, -1, "Settings")
         settingsframe.Show(True)
 
