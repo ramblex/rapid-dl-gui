@@ -127,7 +127,7 @@ class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
         
         self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.OnRightClick)
 
-        self.InsertColumn(0, 'Filename', width=300)
+        self.InsertColumn(0, 'Filename', width=350)
         self.InsertColumn(1, 'Percentage done', width=100)
         self.InsertColumn(2, 'Rate', width=100)
         self.InsertColumn(3, 'ETA', width=80)
@@ -146,8 +146,12 @@ class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
         for row in self.rows:
             row.update()
 
-    def num_dls(self):
-        return self.GetItemCount()
+    def num_active_dls(self):
+        i = 0
+        for row in self.rows: 
+            if row.status == "downloading":
+                i = i + 1
+        return i
 
     def OnRightClick(self, event):
         if self.GetFirstSelected() == -1:
@@ -160,7 +164,7 @@ class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
         menu.Destroy()
 
     def GetSelected(self):
-        return [row for idx, row in enumerate(self.rows) if self.IsSelected(idx)]
+        return [row for row in self.rows if self.IsSelected(row.idx)]
 
     def MenuSelectionCb(self, event):
         operation = self.menu_title_by_id[event.GetId()]
@@ -172,13 +176,19 @@ class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
                 result = dial.ShowModal()
                 if result == wx.ID_YES:
                     selected.cancelled = True
-
+        elif operation == "Remove":
+            for selected in self.GetSelected():
+                print "removing", selected.idx
+                self.DeleteItem(selected.idx)
+                
 class DownloadPanel():
     eta = 0
     rate = 0
     percent_done = 0
     cancelled = False
     filename = ""
+    status = ""
+    idx = -1
 
     def __init__(self, parent, filename, idx):
         self.parent = parent
@@ -188,14 +198,17 @@ class DownloadPanel():
     def update(self):
         self.parent.SetStringItem(self.idx, 1, "%d%%" % self.percent_done)
         if self.cancelled:
+            self.status = "cancelled"
             self.parent.SetStringItem(self.idx, 2, "0 kB/s")
             self.parent.SetStringItem(self.idx, 3, "")
             self.parent.SetStringItem(self.idx, 4, "Cancelled")
         elif self.percent_done == 100:
+            self.status = "completed"
             self.parent.SetStringItem(self.idx, 2, "0 kB/s")
             self.parent.SetStringItem(self.idx, 3, "")
             self.parent.SetStringItem(self.idx, 4, "Completed")
         elif self.percent_done > 0 and self.percent_done < 100:
+            self.status = "downloading"
             self.parent.SetStringItem(self.idx, 2, "%d kB/s" % self.rate)
             self.parent.SetStringItem(self.idx, 3, 
                                       time.strftime("%H:%M:%S", time.gmtime(self.eta)))

@@ -84,7 +84,7 @@ class RapidGUIFrame(wx.Frame):
 
     def updateList(self, event):
         self.dl_list.Update(event)
-        self.nb.SetPageText(1, "Current downloads (%d)" % self.dl_list.num_dls())
+        self.nb.SetPageText(1, "Current downloads (%d)" % self.dl_list.num_active_dls())
 
 class RapidGUI(wx.App):
     def OnInit(self):
