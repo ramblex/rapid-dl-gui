@@ -9,6 +9,8 @@ import os
 import threading
 import time
 
+from wx.lib.mixins.listctrl import ListCtrlAutoWidthMixin
+
 class Downloader():
     chunk_size = 8192
 
@@ -34,7 +36,7 @@ class Downloader():
                 raise ValueError
             return self.get_data(self.handle)
         except ValueError:
-            self.panel.Remove()
+            self.parent.Remove(self.idx)
             dlg = wx.MessageDialog(None, "Invalid URL", "Error",
                                    wx.OK | wx.ICON_ERROR)
             dlg.ShowModal()
@@ -111,136 +113,46 @@ class Downloader():
             num_blocks = num_blocks + 1
         return True
 
-class DownloadPanel(wx.Panel):
-    cancelled = False
-    rate = 0
-    percent_done = 0
-    remove = False
-    eta = 0
-    panel_width = 0
-    filename_width = 45
-    gauge_width = 20
-    complete_width = 10
-    rate_width = 10
-    eta_width = 15
-    panel_height = 25
-
-    def __init__(self, parent, filename, panel_width):
-        wx.Panel.__init__(self, parent)
-        menu_titles = ["Cancel"]
-        self.panel_width = panel_width - 50
-        self.filename = filename
-        self.menu_title_by_id = {}
-        for title in menu_titles:
-            self.menu_title_by_id[wx.NewId()] = title
-
-        self.Bind(wx.EVT_RIGHT_DOWN, self.OnRightClick)
-
-        hbox = wx.BoxSizer(wx.HORIZONTAL)
-        self.txt = wx.StaticText(self, -1, filename, style=wx.ALIGN_LEFT, 
-                                 size=(
-                (self.filename_width / 100.0) * self.panel_width,25))
-        self.txt.Bind(wx.EVT_RIGHT_DOWN, self.OnRightClick)
-        self.gauge = wx.Gauge(self, -1, 100, size=(
-                (self.gauge_width / 100.0) * self.panel_width, 25))
-        self.complete_lbl = wx.StaticText(self, -1, "0%", size=(
-                (self.complete_width / 100.0) * self.panel_width,25))
-        self.rate_lbl = wx.StaticText(self, -1, "Unknown", size=(
-                (self.rate_width / 100.0) * self.panel_width ,25))
-        self.eta_lbl = wx.StaticText(self, -1, "ETA: Unknown", size=(
-                (self.eta_width / 100.0) * self.panel_width,25))
-        hbox.Add(self.txt, 0)
-        hbox.Add(self.gauge, 0, wx.RIGHT, 10)
-        hbox.Add(self.complete_lbl, 0)
-        hbox.Add(self.rate_lbl, 0)
-        hbox.Add(self.eta_lbl, 0)
-        self.SetSizer(hbox)
-
-    def UpdateSize(self, panel_width):
-        print "updating width of panel", self.filename, "to", panel_width
-        self.txt.SetSize(self.filename_width / 100.0 * panel_width, 
-                         self.panel_height)
-        self.gauge.SetSize(self.gauge_width / 100.0 * panel_width, self.panel_height)
-
-    def Update(self):
-        self.gauge.SetValue(self.percent_done)
-        self.complete_lbl.SetLabel("%s%%" % self.percent_done)
-        if self.cancelled:
-            self.rate_lbl.SetLabel("(Cancelled)")
-            self.eta_lbl.SetLabel("")
-        elif self.IsCompleted():
-            self.rate_lbl.SetLabel("(Completed)")
-            self.eta_lbl.SetLabel("")
-        else:
-            self.rate_lbl.SetLabel("%d kB/s" % self.rate)
-            e = time.strftime("%H:%M:%S", time.gmtime(self.eta))
-            self.eta_lbl.SetLabel("ETA: "+e)
-
-    def Remove(self):
-        self.remove = True
-
-    def ToBeRemoved(self):
-        return self.remove
-
-    def IsCompleted(self):
-        return (self.percent_done == 100)
-
-    def Cancel(self):
-        self.cancelled = True
-
-    def OnRightClick(self, event):
-        menu = wx.Menu()
-        for id, title in self.menu_title_by_id.items():
-            menu.Append(id, title)
-            wx.EVT_MENU(menu, id, self.MenuSelectionCb)
-        self.PopupMenu(menu)
-        menu.Destroy()
-
-    def MenuSelectionCb(self, event):
-        operation = self.menu_title_by_id[event.GetId()]
-        if operation == "Cancel":
-            dial = wx.MessageDialog(None, 'Are you sure you want to stop downloading %s' % self.filename, 'Cancel?', wx.YES_NO | wx.ICON_QUESTION)
-            result = dial.ShowModal()
-            if result == wx.ID_YES:
-                self.Cancel()
-
-class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
-    dl_path = ""
-    download_panels = []
+class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
+    rows = []
 
     def __init__(self, parent, width):
-        wx.lib.scrolledpanel.ScrolledPanel.__init__(self, parent, wx.ID_ANY)
-        self._width = width
-
-        self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.SetSizer(self.vbox)
-        self.SetupScrolling()
-
-    def OnResize(self, event):
-        frame_size = event.GetSize()
-        for panel in self.download_panels:
-            panel.UpdateSize(frame_size)
+        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        ListCtrlAutoWidthMixin.__init__(self)
+        
+        self.InsertColumn(0, 'Filename', width=400)
+        self.InsertColumn(1, 'Percentage done', width=100)
+        self.InsertColumn(2, 'Rate', width=100)
+        self.InsertColumn(3, 'ETA', width=80)
 
     def AddDownload(self, url, dl_path):
-        panel = DownloadPanel(self, os.path.basename(url), self._width)
-        downloader = Downloader(url, dl_path, panel)
+        num_items = self.GetItemCount()
+        self.InsertStringItem(num_items, url)
+        p = DownloadPanel(self, num_items)
+        self.rows.insert(num_items, p)
+        downloader = Downloader(url, dl_path, p)
         thread = threading.Thread(target=downloader.download)
         thread.start()
-        self.download_panels.append(panel)
-        self.vbox.Add(panel)
-        self.Layout()
 
     def Update(self, event):
-        panels = self.download_panels[:]
-        for panel in panels:
-            if panel.ToBeRemoved():
-                print "Removing panel", panel.filename
-                panel.Hide()
-                self.vbox.Remove(panel)
-                self.vbox.Layout()
-                self.download_panels.remove(panel)
-            else:
-                panel.Update()
+        for row in self.rows:
+            row.update()
 
-    def GetDownloadPanels(self):
-        return self.download_panels
+    def num_dls(self):
+        return self.GetItemCount()
+
+class DownloadPanel():
+    eta = 0
+    rate = 0
+    percent_done = 0
+    cancelled = False
+
+    def __init__(self, parent, idx):
+        self.parent = parent
+        self.idx = idx
+
+    def update(self):
+        self.parent.SetStringItem(self.idx, 1, "%d%%" % self.percent_done)
+        self.parent.SetStringItem(self.idx, 2, "%d kB/s" % self.rate)
+        self.parent.SetStringItem(self.idx, 3, 
+                                  time.strftime("%H:%M:%S", time.gmtime(self.eta)))

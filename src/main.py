@@ -6,7 +6,7 @@ import wx
 import os
 import time
 
-from downloader import DownloadList
+from downloader import DownloadListCtrl
 from settings import Settings, load_cookie
 
 FRAME_INIT_WIDTH = 800
@@ -18,7 +18,7 @@ class RapidGUIFrame(wx.Frame):
         self.nb = wx.Notebook(self, -1)
 
         self.panel = wx.Panel(self.nb, -1)
-        self.dl_list = DownloadList(self.nb, FRAME_INIT_WIDTH)
+        self.dl_list = DownloadListCtrl(self.nb, FRAME_INIT_WIDTH)
 
         self.timer = wx.Timer(self.panel, 1)
         wx.EVT_TIMER(self.panel, 1, self.updateList)
@@ -84,8 +84,7 @@ class RapidGUIFrame(wx.Frame):
 
     def updateList(self, event):
         self.dl_list.Update(event)
-        self.nb.SetPageText(1, "Current downloads (%d)" % 
-                            len(self.dl_list.GetDownloadPanels()))
+        self.nb.SetPageText(1, "Current downloads (%d)" % self.dl_list.num_dls())
 
 class RapidGUI(wx.App):
     def OnInit(self):
