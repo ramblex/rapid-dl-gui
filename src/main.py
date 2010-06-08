@@ -26,7 +26,7 @@ class RapidGUIFrame(wx.Frame):
 
         # Edit menu
         editmenu = wx.Menu()
-        settings = wx.MenuItem(editmenu, 2, 'Settings')
+        settings = wx.MenuItem(editmenu, 2, '&Settings')
         editmenu.AppendItem(settings)
         self.Bind(wx.EVT_MENU, self.OnSettings, id=2)
         menubar.Append(editmenu, '&Edit')
@@ -81,7 +81,8 @@ class RapidGUIFrame(wx.Frame):
 
     def OnSettings(self, event):
         settingsframe = Settings(None, -1, "Settings")
-        settingsframe.Show(True)
+        settingsframe.ShowModal()
+        settingsframe.Destroy()
 
     def OnDownloadBtn(self, event):
         dial = wx.DirDialog(None, "Choose a download directory", 
