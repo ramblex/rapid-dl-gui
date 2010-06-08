@@ -24,17 +24,14 @@ class Downloader():
         try:
             server_url = self.get_server_url(self.url)
             if not server_url.startswith("http://"):
-                # @todo Throw an exception?
-                return None
+                raise ValueError
             actual_url = self.get_actual_url(server_url)
             if not actual_url.startswith("http://"):
-                # @todo Throw an exception?
-                return None
+                raise ValueError
             request = urllib2.Request(actual_url)
             self.handle = urllib2.urlopen(request)
             if self.handle == None:
-                # @todo Throw an exception?
-                return None
+                raise ValueError
             return self.get_data(self.handle)
         except ValueError:
             self.panel.Remove()
@@ -57,7 +54,7 @@ class Downloader():
             eol = page.find("\n", idx)
             return page[idx:eol].rsplit('"')[1]
         else:
-            return None
+            return ""
 
     def get_actual_url(self, server_url):
         """Find the download URL from a given server URL.
@@ -75,7 +72,7 @@ class Downloader():
         if idx != -1:
             eol = page.find("\n", idx)
             return page[idx:eol].rsplit('"')[3]
-        return None
+        return ""
 
     def filename(self):
         return self.handle.info().getheader('Content-disposition').split("=")[-1]
@@ -120,10 +117,18 @@ class DownloadPanel(wx.Panel):
     percent_done = 0
     remove = False
     eta = 0
+    panel_width = 0
+    filename_width = 45
+    gauge_width = 20
+    complete_width = 10
+    rate_width = 10
+    eta_width = 15
+    panel_height = 25
 
-    def __init__(self, parent, filename):
+    def __init__(self, parent, filename, panel_width):
         wx.Panel.__init__(self, parent)
         menu_titles = ["Cancel"]
+        self.panel_width = panel_width - 50
         self.filename = filename
         self.menu_title_by_id = {}
         for title in menu_titles:
@@ -133,18 +138,29 @@ class DownloadPanel(wx.Panel):
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         self.txt = wx.StaticText(self, -1, filename, style=wx.ALIGN_LEFT, 
-                                 size=(400,25))
+                                 size=(
+                (self.filename_width / 100.0) * self.panel_width,25))
         self.txt.Bind(wx.EVT_RIGHT_DOWN, self.OnRightClick)
-        self.gauge = wx.Gauge(self, -1, 100, size=(90,25))
-        self.complete_lbl = wx.StaticText(self, -1, "0%", size=(75,25))
-        self.rate_lbl = wx.StaticText(self, -1, "Unknown", size=(100,25))
-        self.eta_lbl = wx.StaticText(self, -1, "ETA: Unknown", size=(125,25))
+        self.gauge = wx.Gauge(self, -1, 100, size=(
+                (self.gauge_width / 100.0) * self.panel_width, 25))
+        self.complete_lbl = wx.StaticText(self, -1, "0%", size=(
+                (self.complete_width / 100.0) * self.panel_width,25))
+        self.rate_lbl = wx.StaticText(self, -1, "Unknown", size=(
+                (self.rate_width / 100.0) * self.panel_width ,25))
+        self.eta_lbl = wx.StaticText(self, -1, "ETA: Unknown", size=(
+                (self.eta_width / 100.0) * self.panel_width,25))
         hbox.Add(self.txt, 0)
         hbox.Add(self.gauge, 0, wx.RIGHT, 10)
         hbox.Add(self.complete_lbl, 0)
         hbox.Add(self.rate_lbl, 0)
         hbox.Add(self.eta_lbl, 0)
         self.SetSizer(hbox)
+
+    def UpdateSize(self, panel_width):
+        print "updating width of panel", self.filename, "to", panel_width
+        self.txt.SetSize(self.filename_width / 100.0 * panel_width, 
+                         self.panel_height)
+        self.gauge.SetSize(self.gauge_width / 100.0 * panel_width, self.panel_height)
 
     def Update(self):
         self.gauge.SetValue(self.percent_done)
@@ -192,14 +208,21 @@ class DownloadList(wx.lib.scrolledpanel.ScrolledPanel):
     dl_path = ""
     download_panels = []
 
-    def __init__(self, parent):
+    def __init__(self, parent, width):
         wx.lib.scrolledpanel.ScrolledPanel.__init__(self, parent, wx.ID_ANY)
+        self._width = width
+
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.vbox)
         self.SetupScrolling()
 
+    def OnResize(self, event):
+        frame_size = event.GetSize()
+        for panel in self.download_panels:
+            panel.UpdateSize(frame_size)
+
     def AddDownload(self, url, dl_path):
-        panel = DownloadPanel(self, os.path.basename(url))
+        panel = DownloadPanel(self, os.path.basename(url), self._width)
         downloader = Downloader(url, dl_path, panel)
         thread = threading.Thread(target=downloader.download)
         thread.start()

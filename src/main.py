@@ -9,6 +9,8 @@ import time
 from downloader import DownloadList
 from settings import Settings, load_cookie
 
+FRAME_INIT_WIDTH = 800
+
 class RapidGUIFrame(wx.Frame):
     def __init__(self, parent, id, title):
         wx.Frame.__init__(self, parent, id, title, size=(800, 500))
@@ -16,7 +18,7 @@ class RapidGUIFrame(wx.Frame):
         self.nb = wx.Notebook(self, -1)
 
         self.panel = wx.Panel(self.nb, -1)
-        self.dl_list = DownloadList(self.nb)
+        self.dl_list = DownloadList(self.nb, FRAME_INIT_WIDTH)
 
         self.timer = wx.Timer(self.panel, 1)
         wx.EVT_TIMER(self.panel, 1, self.updateList)
