@@ -115,20 +115,28 @@ class Downloader():
 
 class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     rows = []
+    menu_titles = ["Cancel"]
 
     def __init__(self, parent, width):
         wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
         ListCtrlAutoWidthMixin.__init__(self)
+
+        self.menu_title_by_id = {}
+        for title in self.menu_titles:
+            self.menu_title_by_id[wx.NewId()] = title
         
-        self.InsertColumn(0, 'Filename', width=400)
+        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.OnRightClick)
+
+        self.InsertColumn(0, 'Filename', width=300)
         self.InsertColumn(1, 'Percentage done', width=100)
         self.InsertColumn(2, 'Rate', width=100)
         self.InsertColumn(3, 'ETA', width=80)
+        self.InsertColumn(4, 'Status', width=80)
 
     def AddDownload(self, url, dl_path):
         num_items = self.GetItemCount()
         self.InsertStringItem(num_items, url)
-        p = DownloadPanel(self, num_items)
+        p = DownloadPanel(self, url, num_items)
         self.rows.insert(num_items, p)
         downloader = Downloader(url, dl_path, p)
         thread = threading.Thread(target=downloader.download)
@@ -141,18 +149,54 @@ class DownloadListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def num_dls(self):
         return self.GetItemCount()
 
+    def OnRightClick(self, event):
+        if self.GetFirstSelected() == -1:
+            return
+        menu = wx.Menu()
+        for id, title in self.menu_title_by_id.items():
+            menu.Append(id, title)
+            wx.EVT_MENU(menu, id, self.MenuSelectionCb)
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def GetSelected(self):
+        return [row for idx, row in enumerate(self.rows) if self.IsSelected(idx)]
+
+    def MenuSelectionCb(self, event):
+        operation = self.menu_title_by_id[event.GetId()]
+        if operation == "Cancel":
+            for selected in self.GetSelected():
+                if selected.cancelled:
+                    continue
+                dial = wx.MessageDialog(None, 'Are you sure you want to stop downloading %s' % selected.filename, 'Cancel?', wx.YES_NO | wx.ICON_QUESTION)
+                result = dial.ShowModal()
+                if result == wx.ID_YES:
+                    selected.cancelled = True
+
 class DownloadPanel():
     eta = 0
     rate = 0
     percent_done = 0
     cancelled = False
+    filename = ""
 
-    def __init__(self, parent, idx):
+    def __init__(self, parent, filename, idx):
         self.parent = parent
+        self.filename = filename
         self.idx = idx
 
     def update(self):
         self.parent.SetStringItem(self.idx, 1, "%d%%" % self.percent_done)
-        self.parent.SetStringItem(self.idx, 2, "%d kB/s" % self.rate)
-        self.parent.SetStringItem(self.idx, 3, 
-                                  time.strftime("%H:%M:%S", time.gmtime(self.eta)))
+        if self.cancelled:
+            self.parent.SetStringItem(self.idx, 2, "0 kB/s")
+            self.parent.SetStringItem(self.idx, 3, "")
+            self.parent.SetStringItem(self.idx, 4, "Cancelled")
+        elif self.percent_done == 100:
+            self.parent.SetStringItem(self.idx, 2, "0 kB/s")
+            self.parent.SetStringItem(self.idx, 3, "")
+            self.parent.SetStringItem(self.idx, 4, "Completed")
+        elif self.percent_done > 0 and self.percent_done < 100:
+            self.parent.SetStringItem(self.idx, 2, "%d kB/s" % self.rate)
+            self.parent.SetStringItem(self.idx, 3, 
+                                      time.strftime("%H:%M:%S", time.gmtime(self.eta)))
+            self.parent.SetStringItem(self.idx, 4, "Downloading")
